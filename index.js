@@ -7,6 +7,7 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb')
 const jwt = require('jsonwebtoken')
 const morgan = require('morgan')
 const port = process.env.PORT || 8000
+const stripe = require('stripe')(process.env.PAYMENT_SECRET_KEY)
 
 // middleware
 const corsOptions = {
@@ -97,32 +98,45 @@ async function run() {
     })
 
     // get user role
-    app.get('/user/:email',async(req,res) =>{
-    const email= req.params.email;
-    const result = await usersCollection.findOne({email});
-    res.send(result);
+    app.get('/user/:email', async (req, res) => {
+      const email = req.params.email;
+      const result = await usersCollection.findOne({ email });
+      res.send(result);
     })
     // get all rooms 
-    app.get('/rooms',async(req,res) =>{
+    app.get('/rooms', async (req, res) => {
       const result = await roomsCollection.find().toArray();
       res.send(result);
     })
+    // Generate client secret for stripe
+    app.post('/client-payment-intent', verifyToken, async (req, res) => {
+      const {price} = req.body;
+      const amount = parseInt(price * 100);
+      if (!price || amount < 1) return;
+      const {client_secret} = await stripe.paymentIntents.create({
+        amount:amount,
+        currency:'usd',
+        payment_method_types:['card']
+      })
+      res.send({clientSecret : client_secret})
+
+    })
     // get room for host
-  app.get('/rooms/:email',async(req,res) =>{
-    const email=req.params.email;
-    const result = await roomsCollection.find({'host.email':email}).toArray();
-    res.send(result);
-  })
+    app.get('/rooms/:email', async (req, res) => {
+      const email = req.params.email;
+      const result = await roomsCollection.find({ 'host.email': email }).toArray();
+      res.send(result);
+    })
     // get single room 
-    app.get('/room/:id',async(req,res) =>{
+    app.get('/room/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await roomsCollection.findOne({_id:new ObjectId(id)});
+      const result = await roomsCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     })
 
     // sava a room in database
-    app.post('/rooms',verifyToken,async(req,res) =>{
-      const room= req.body;
+    app.post('/rooms', verifyToken, async (req, res) => {
+      const room = req.body;
       const result = await roomsCollection.insertOne(room);
       res.send(result);
     })
