@@ -46,6 +46,7 @@ async function run() {
   try {
     const usersCollection = client.db('stayVistaDB').collection('users');
     const roomsCollection = client.db('stayVistaDB').collection('rooms')
+    const bookingsCollection = client.db('stayVistaDB').collection('bookings')
     // auth related api
     app.post('/jwt', async (req, res) => {
       const user = req.body
@@ -108,19 +109,7 @@ async function run() {
       const result = await roomsCollection.find().toArray();
       res.send(result);
     })
-    // Generate client secret for stripe
-    app.post('/client-payment-intent', verifyToken, async (req, res) => {
-      const {price} = req.body;
-      const amount = parseInt(price * 100);
-      if (!price || amount < 1) return;
-      const {client_secret} = await stripe.paymentIntents.create({
-        amount:amount,
-        currency:'usd',
-        payment_method_types:['card']
-      })
-      res.send({clientSecret : client_secret})
 
-    })
     // get room for host
     app.get('/rooms/:email', async (req, res) => {
       const email = req.params.email;
@@ -133,13 +122,33 @@ async function run() {
       const result = await roomsCollection.findOne({ _id: new ObjectId(id) });
       res.send(result);
     })
-
     // sava a room in database
     app.post('/rooms', verifyToken, async (req, res) => {
       const room = req.body;
       const result = await roomsCollection.insertOne(room);
       res.send(result);
     })
+    // Generate client secret for stripe
+    app.post('/client-payment-intent', verifyToken, async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      if (!price || amount < 1) return;
+      const { client_secret } = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      })
+      res.send({ clientSecret: client_secret })
+
+    })
+    // save bookings info in bookings collection
+
+   app.post('/bookings',async(req,res) =>{
+    const booking = req.body;
+    const result = await bookingsCollection.insertOne(booking);
+    // sent email----->
+    res.send(result);
+   })
 
     // Send a ping to confirm a successful connection
     await client.db('admin').command({ ping: 1 })
